@@ -1,0 +1,140 @@
+#include <iostream>
+#include <locale.h>
+#include "GnuP.h"
+#include <cmath>
+#include <fstream>
+using namespace std;
+
+double* slau(double** A, double* Y, int n) {
+double* X, maxn;
+int k, index;
+const double eps = 0.00001;
+X = new double[n];
+k = 0;
+while (k < n) {
+maxn = abs(A[k][k]);
+index = k;
+for (int i = k + 1; i < n; i++)
+if (abs(A[i][k]) > maxn) {
+maxn = abs(A[i][k]);
+index = i;
+}
+for (int j = 0; j < n; j++) {
+double temp = A[k][j];
+A[k][j] = A[index][j];
+A[index][j] = temp;
+}
+double temp = Y[k];
+Y[k] = Y[index];
+Y[index] = temp;
+for (int i = k; i < n; i++) {
+double temp = A[i][k];
+if (abs(temp) < eps) continue;
+for (int j = 0; j < n; j++)
+A[i][j] = A[i][j] / temp;
+Y[i] = Y[i] / temp;
+if (i == k)
+continue;
+for (int j = 0; j < n; j++)
+A[i][j] = A[i][j] - A[k][j];
+Y[i] = Y[i] - Y[k];
+}
+k++;
+}
+for (k = n - 1; k >= 0; k--) {
+X[k] = Y[k];
+for (int i = 0; i < k; i++)
+Y[i] = Y[i] - A[i][k] * X[k];
+}
+return X;
+}
+
+int main() {
+setlocale(LC_ALL, "Rus");
+double* A, *x, * y, ** Z, * b, A1[2], * y2, sum = 0, mid;
+int n = 9, N = 3;
+ifstream f("mean.txt");
+x = new double[n];
+y = new double[n];
+if (f.is_open()) {
+cout << "Заданные значения X и Y:" << endl;
+for (int i = 0; i < n; i++) {
+f >> x[i];
+f >> y[i];
+cout << "X" << i + 1 << " = " << x[i] << "" << ";" << " ";
+cout << "Y" << i + 1 << " = " << y[i] << endl;
+}
+f.close();
+Z = new double* [N];
+b = new double[N];
+A = new double[N];
+for (int i = 0; i < N; i++)
+Z[i] = new double[N];
+Z[0][0] = n; Z[0][1] = 0; Z[0][2] = 0;
+Z[1][0] = 0; Z[1][1] = 0; Z[1][2] = 0;
+Z[2][0] = 0; Z[2][1] = 0; Z[2][2] = 0;
+b[0] = 0; b[1] = 0; b[2] = 0;
+for (int i = 0; i < n; i++) {
+Z[0][1] += x[i]; Z[0][2] += x[i] * x[i];
+Z[1][0] += x[i]; Z[1][1] += x[i] * x[i]; Z[1][2] += pow(x[i], 3);
+Z[2][0] += x[i] * x[i]; Z[2][1] += pow(x[i], 3); Z[2][2] += pow(x[i], 4);
+b[0] += y[i]; b[1] += y[i] * x[i]; b[2] += y[i] * x[i] * x[i];
+}
+A = slau(Z, b, N);
+cout << endl;
+cout << "A: ";
+A1[0] = 0; A1[1] = 0;
+double chisl1 = 0, chisl2 = 0, chisl3 = 0, znam1 = 0, znam2 = 0;
+for (int i = 0; i < 2; i++) {
+chisl1 += x[i] * y[i];
+chisl2 += x[i]; chisl3 += y[i];
+znam1 += x[i] * x[i];
+znam2 += x[i];
+if (i == 1) {
+A1[1] = (n * chisl1 - chisl2 * chisl3) / (n * znam1 - znam2 * znam2);
+A1[0] = chisl3 / n - A1[1] * znam2 / n;
+}
+}
+for (int i = 0; i < N; i++)cout << A[i] << " ";
+cout << endl;
+cout << "Линия регрессии: у = " << A1[0] << " + " << A1[1] << "х" << endl;
+double r = 0, Mx = 0, My = 0;
+for (int i = 0; i < n; i++) {
+Mx += x[i]; My += y[i];
+if (i == n - 1) {
+Mx /= n;
+My /= n;
+}
+}
+for (int i = 0; i < n; i++) {
+double chisl = 0, znam1 = 0, znam2 = 0;
+chisl += (x[i] - Mx) * (y[i] - My);
+znam1 += (x[i] - Mx) * (x[i] - Mx);
+znam2 += (y[i] - My) * (y[i] - My);
+if (i == n - 1)
+r = chisl / sqrt(znam1 * znam2);
+}
+cout << "Коэффициент корреляции: r = " << r << endl;
+y2 = new double[n];
+for (int i = 0; i < n; i++)
+y2[i] = A1[0] + A1[1] * x[i];
+for (int i = 0; i < n; i++)
+sum += (y[i] - y2[i]) * (y[i] - y2[i]);
+mid = sum / n;
+cout << "Средняя ошибка для линии регрессии и подобранной функции: " << mid << endl;
+cout << "Суммарная квадратичная ошибка для линии регрессии и подобранной функции: " << sum << endl;
+GnuP p;
+p.plotArray(n, x, y);
+p.plotArrayPar(n, x, y,3,2,12,"Точки");
+double x1[100],y1[100], y3[100];
+for (int i=0; i < 100; i++) {
+x1[i] = i/ 25.0;
+y1[i] = A1[0]+x1[i]*A1[1];
+y3[i] = A[0]+A[1]*x1[i]+A[2]*x1[i]*x1[i];
+}
+p.plotArray(100, x1, y1,y3);
+p.plot();
+return 0;
+}
+else cout << "Файл не найден";
+}
